@@ -28,6 +28,7 @@
 
 ## Dependence
 
+* 使用的JDK版本为11
 * Fastjson 1.2.50
 * lombok 1.18.18
 
