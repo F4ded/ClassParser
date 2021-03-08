@@ -4,6 +4,7 @@ package class_parser;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.annotation.JSONField;
 import lombok.Getter;
+import org.objectweb.asm.Opcodes;
 import utils.FormatUtil;
 
 import java.io.DataInputStream;
@@ -12,7 +13,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-public class ClassParser {
+public class ClassParser implements Opcodes {
     private DataInputStream dis;
     @Getter
     @JSONField
@@ -49,19 +50,19 @@ public class ClassParser {
     private int fields_count;
     @Getter
     @JSONField(ordinal = 11)
-    private Map<Integer, Map<String, Object>> fields;
+    private Map<String, Map<String, Object>> fields;
     @Getter
     @JSONField(ordinal = 12)
     private int methods_count;
     @Getter
     @JSONField(ordinal = 13)
-    private Map<Integer, Map<String, Object>> methods;
+    private Map<String, Map<String, Object>> methods;
     @Getter
     @JSONField(ordinal = 14)
     private int attribute_count;
     @Getter
     @JSONField(ordinal = 15)
-    private Map<Integer, Map<String, Object>> attributes;
+    private Map<String, Map<String, Object>> attributes;
 
     // fis -> dis
     public void parse(FileInputStream fis) throws IOException {
@@ -320,7 +321,7 @@ public class ClassParser {
          }
          */
         fields = new LinkedHashMap<>();
-        getFieldsOrMethodInfo(fields, fields_count);
+        getFieldsOrMethodInfo(fields, fields_count, false);
 
         /*
         解析方法
@@ -328,7 +329,7 @@ public class ClassParser {
          */
         this.methods_count = dis.readUnsignedShort();
         methods = new LinkedHashMap<>();
-        getFieldsOrMethodInfo(methods, methods_count);
+        getFieldsOrMethodInfo(methods, methods_count, true);
 
         /*
         解析属性
@@ -339,7 +340,272 @@ public class ClassParser {
         getAttributeInfo(attributes, this.attribute_count);
     }
 
-    private void getFieldsOrMethodInfo(Map<Integer, Map<String, Object>> fieldsOrMethods, int count) throws IOException {
+    /**
+     * 具体解析各类属性信息
+     *
+     * @param attr_info_index 包含属性信息的Map (带索引值)
+     * @param attribute_count 属性数量
+     * @throws IOException
+     */
+    private void getAttributeInfo(Map<String, Map<String, Object>> attr_info_index, int attribute_count) throws IOException {
+        if (attribute_count > 0) {
+            for (int i = 0; i < attribute_count; i++) {
+                /*
+                Map<String, Object>来存储具体属性信息
+                 */
+                LinkedHashMap<String, Object> attr_info = new LinkedHashMap<>();
+                int attr_name_index = dis.readUnsignedShort();
+                attr_info.put("attribute_name_index", getCpInfoByIndex(attr_name_index));
+                int attribute_length = dis.readInt();
+                attr_info.put("attribute_length", attribute_length);
+
+                // TODO：具体解析各类属性信息
+                switch (Objects.requireNonNull(getCpInfoByIndex(attr_name_index)).substring(Objects.requireNonNull(getCpInfoByIndex(attr_name_index)).indexOf(" ") + 1)) {
+                     /*
+                     ConstantValue_attribute {
+                         u2 attribute_name_index;
+                         u4 attribute_length;
+                         u2 constantValue_index;
+                     }
+                     */
+                    case "ConstantValue": {
+                        attr_info.put("constant_value_index", getCpInfoByIndex(dis.readUnsignedShort()));
+                        break;
+                    }
+                    /*
+                     Code_attribute {
+                         u2 attribute_name_index;
+                         u4 attribute_length;
+                         u2 max_stack;
+                         u2 max_locals;
+                         u4 code_length;
+                         u1 code[code_length];
+                         u2 exception_table_length;
+                         { u2 start_pc;
+                           u2 end_pc;
+                           u2 handler_pc;
+                           u2 catch_type;
+                         } exception_table[exception_table_length];
+                         u2 attributes_count;
+                         attribute_info attributes[attributes_count];
+                    }
+                     */
+                    case "Code": {
+                        attr_info.put("max_stack", dis.readUnsignedShort());
+                        attr_info.put("max_locals", dis.readUnsignedShort());
+                        int code_length = dis.readInt();
+                        attr_info.put("code_length", code_length);
+                        byte[] code = new byte[code_length];
+                        // TODO:解析虚拟机指令
+                        dis.read(code);
+                        attr_info.put("code", code);
+
+                        int exception_table_length = dis.readUnsignedShort();
+                        attr_info.put("exception_table_length", exception_table_length);
+                        // TODO:解析异常表
+                        for (int j = 0; j < exception_table_length; j++) {
+                            LinkedHashMap<String, Object> exception_table = new LinkedHashMap<>();
+                            int start_pc = dis.readUnsignedShort();
+                            exception_table.put("start_pc", start_pc);
+                            int end_pc = dis.readUnsignedShort();
+                            exception_table.put("end_pc", end_pc);
+                            int handler_pc = dis.readUnsignedShort();
+                            exception_table.put("handler_pc", handler_pc);
+                            int catch_type = dis.readUnsignedShort();
+                            exception_table.put("catch_type", getCpInfoByIndex(catch_type));
+
+                            attr_info.put("exception_table #" + j, exception_table);
+                        }
+
+                        int attributes_count = dis.readUnsignedShort();
+                        attr_info.put("attributes_count", attributes_count);
+
+                        Map<String, Map<String, Object>> code_attr = new LinkedHashMap<>();
+                        // 递归调用，继续解析 Code 属性中的属性
+                        getAttributeInfo(code_attr, attributes_count);
+                        attr_info.put("Code_attribute_info", code_attr);
+                        break;
+                    }
+
+                    case "LineNumberTable": {
+                        int line_number_table_length = dis.readUnsignedShort();
+                        attr_info.put("line_number_table_length", line_number_table_length);
+                        for (int j = 0; j < line_number_table_length; j++) {
+                            LinkedHashMap<String, Object> line_number_table = new LinkedHashMap<>();
+                            int start_pc = dis.readUnsignedShort();
+                            int line_number = dis.readUnsignedShort();
+                            line_number_table.put("start_pc", start_pc);
+                            line_number_table.put("line_number", line_number);
+                            attr_info.put("line_number_table #" + j, line_number_table);
+                        }
+                        break;
+                    }
+
+                    /*
+                    LocalVariableTable_attribute {
+                        u2 attribute_name_index;
+                        u4 attribute_length;
+                        u2 local_variable_table_length;
+                        {   u2 start_pc;
+                            u2 length;
+                            u2 name_index;
+                            u2 descriptor_index;
+                            u2 index;
+                        } local_variable_table[local_variable_table_length];
+                    }
+                     */
+                    case "LocalVariableTable": {
+                        int local_variable_table_length = dis.readUnsignedShort();
+                        attr_info.put("local_variable_table_length", local_variable_table_length);
+
+                        for (int j = 0; j < local_variable_table_length; j++) {
+                            LinkedHashMap<String, Object> local_variable_table = new LinkedHashMap<>();
+                            int start_pc = dis.readUnsignedShort();
+                            int length = dis.readUnsignedShort();
+                            int name_index = dis.readUnsignedShort();
+                            int index = dis.readUnsignedShort();
+
+                            local_variable_table.put("start_pc", start_pc);
+                            local_variable_table.put("length", length);
+                            local_variable_table.put("name_index", getCpInfoByIndex(name_index));
+                            local_variable_table.put("index", getCpInfoByIndex(index));
+
+                            attr_info.put("local_variable_table #" + j, local_variable_table);
+                        }
+                        /*
+                        TODO: 解析完方法的code属性会留出两个字节的00，原因目前未知。
+                         */
+                        dis.readUnsignedShort();
+                        break;
+                    }
+                    /*
+                    SourceFile_attribute {
+                        u2 attribute_name_index;
+                        u4 attribute_length;
+                        u2 sourcefile_index;
+                    }
+                     */
+                    case "SourceFile": {
+                        int source_file_index = dis.readUnsignedShort();
+                        attr_info.put("source_file_index", getCpInfoByIndex(source_file_index));
+                        break;
+                    }
+                    /*
+                    InnerClasses_attribute {
+                        u2 attribute_name_index;
+                        u4 attribute_length;
+                        u2 number_of_classes;
+                        {   u2 inner_class_info_index;
+                            u2 outer_class_info_index;
+                            u2 inner_name_index;
+                            u2 inner_class_access_flags;
+                        } classes[number_of_classes];
+                    }
+                     */
+                    case "InnerClasses": {
+                        int number_of_classes = dis.readUnsignedShort();
+                        attr_info.put("number_of_classes", number_of_classes);
+                        for (int j = 0; j < number_of_classes; j++) {
+                            LinkedHashMap<String, Object> classes = new LinkedHashMap<>();
+                            // u2 inner_class_info_index;
+                            int inner_class_info_index = dis.readUnsignedShort();
+                            classes.put("inner_class_info_index", getCpInfoByIndex(inner_class_info_index));
+                            // u2 outer_class_info_index;
+                            int outer_class_info_index = dis.readUnsignedShort();
+                            classes.put("outer_class_info_index", getCpInfoByIndex(outer_class_info_index));
+                            // u2 inner_name_index;
+                            int inner_name_index = dis.readUnsignedShort();
+                            classes.put("inner_name_index", getCpInfoByIndex(inner_name_index));
+                            // u2 inner_class_access_flags;
+                            int inner_class_access = dis.readUnsignedShort();
+                            classes.put("inner_class_access", inner_class_access);
+
+                            attr_info.put("classes #" + j, classes);
+                        }
+                        break;
+                    }
+                    /*
+                    BootstrapMethods_attribute {
+                        u2 attribute_name_index;
+                        u4 attribute_length;
+                        u2 num_bootstrap_methods;
+                        {   u2 bootstrap_method_ref;
+                            u2 num_bootstrap_arguments;
+                            u2 bootstrap_arguments[num_bootstrap_arguments];
+                        } bootstrap_methods[num_bootstrap_methods];
+                    }
+                     */
+                    case "BootstrapMethods": {
+                        // u2 num_bootstrap_methods;
+                        int num_bootstrap_methods = dis.readUnsignedShort();
+                        attr_info.put("num_bootstrap_methods", num_bootstrap_methods);
+                        for (int j = 0; j < num_bootstrap_methods; j++) {
+                            LinkedHashMap<String, Object> bootstrap_methods = new LinkedHashMap<>();
+                            // u2 bootstrap_method_ref;
+                            int bootstrap_method_ref = dis.readUnsignedShort();
+                            bootstrap_methods.put("bootstrap_method_ref", getCpInfoByIndex(bootstrap_method_ref));
+                            // u2 num_bootstrap_arguments;
+                            int num_bootstrap_arguments = dis.readUnsignedShort();
+                            bootstrap_methods.put("num_bootstrap_arguments", num_bootstrap_arguments);
+                            // u2 bootstrap_arguments[num_bootstrap_arguments];
+                            String[] bootstrap_arguments = new String[num_bootstrap_arguments];
+                            for (int k = 0; k < num_bootstrap_arguments; k++) {
+                                bootstrap_arguments[k] = getCpInfoByIndex(dis.readUnsignedShort());
+                            }
+                            bootstrap_methods.put("bootstrap_arguments", bootstrap_arguments);
+                            attr_info.put("bootstrap_methods #" + j, bootstrap_methods);
+                        }
+                        break;
+                    }
+                    /*
+                    Exceptions_attribute {
+                        u2 attribute_name_index;
+                        u4 attribute_length;
+                        u2 number_of_exceptions;
+                        u2 exception_index_table[number_of_exceptions];
+                    }
+                     */
+                    case "Exceptions": {
+                        // u2 number_of_exceptions;
+                        int number_of_exceptions = dis.readUnsignedShort();
+                        attr_info.put("number_of_exceptions", number_of_exceptions);
+                        // u2 exception_index_table[number_of_exceptions];
+                        String[] exception_index_table = new String[number_of_exceptions];
+                        for (int j = 0; j < number_of_exceptions; j++) {
+                            int exception_index = dis.readUnsignedShort();
+                            exception_index_table[j] = getCpInfoByIndex(exception_index);
+                        }
+                        attr_info.put("exception_index_table", exception_index_table);
+                        break;
+                    }
+                    /*
+
+                     */
+                    default: {
+                        byte[] info = new byte[attribute_length];
+                        dis.read(info);
+                        attr_info.put("info", info);
+                    }
+                }
+
+
+                /*
+                最后放入到带索引信息的总Map中
+                 */
+                attr_info_index.put("attribute #" + i, attr_info);
+            }
+        }
+    }
+
+
+    /**
+     * 解析字段信息和方法信息
+     *
+     * @param fieldsOrMethods 包含字段或者方法信息的Map
+     * @param count           字段或者方法的数量
+     * @throws IOException
+     */
+    private void getFieldsOrMethodInfo(Map<String, Map<String, Object>> fieldsOrMethods, int count, boolean isMethod) throws IOException {
         for (int i = 0; i < count; i++) {
             LinkedHashMap<String, Object> info_map = new LinkedHashMap<>();
             // u2 access_flags
@@ -362,52 +628,79 @@ public class ClassParser {
                 u1 info[attribute_length]; //属性信息，不同属性的结构不同
             }
              */
-            LinkedHashMap<Integer, Map<String, Object>> attr_info_index = new LinkedHashMap<>();
+            LinkedHashMap<String, Map<String, Object>> attr_info_index = new LinkedHashMap<>();
             getAttributeInfo(attr_info_index, attribute_count);
             info_map.put("attribute_info", attr_info_index);
-            fieldsOrMethods.put(i + 1, info_map);
-        }
-    }
 
-    private void getAttributeInfo(Map<Integer, Map<String, Object>> attr_info_index, int attribute_count) throws IOException {
-        if (attribute_count > 0) {
-            for (int i = 0; i < attribute_count; i++) {
-                LinkedHashMap<String, Object> attr_info = new LinkedHashMap<>();
-                int attr_name_index = dis.readUnsignedShort();
-                attr_info.put("attribute_name_index", getCpInfoByIndex(attr_name_index));
-                int attribute_length = dis.readInt();
-                // TODO：具体解析各类属性信息
-                byte[] info = new byte[attribute_length];
-                dis.read(info);
-
-                attr_info.put("attr_info", info);
-                attr_info_index.put(i + 1, attr_info);
-            }
-        }
-    }
-
-    private String getCpInfoByIndex(int index) throws IOException {
-        String cp_info, bytes_value;
-        if (index > 0) {
-            if (constant_pool.get(index).containsKey("constant_class_index")) {
-                cp_info = (String) constant_pool.get(index).get("constant_class_index");
-                if (cp_info == null) {
-                    throw new IOException("[cp_info parse error!]");
-                }
-                return "#" + index + cp_info.substring(cp_info.indexOf(" "));
-            } else if (constant_pool.get(index).containsKey("bytes")) {
-                bytes_value = (String) constant_pool.get(index).get("bytes");
-                if (bytes_value == null) {
-                    throw new IOException("[bytes_value parse error!]");
-                }
-                return "#" + index + " " + bytes_value;
+            if (isMethod) {
+                fieldsOrMethods.put("method #" + i, info_map);
             } else {
-                throw new IOException("[key parse error!]");
+                fieldsOrMethods.put("field #" + i, info_map);
             }
         }
-        return null;
     }
 
+    /**
+     * 根据索引值获取在常量池中的信息
+     *
+     * @param index 常量池中的索引
+     * @return 该索引在常量池中对应的元素
+     * @throws IOException
+     */
+    private String getCpInfoByIndex(int index) throws IOException {
+        String result = null;
+        if (index > 0) {
+            Set<String> keys = constant_pool.get(index).keySet();
+            for (String key : keys) {
+                if (key.endsWith("_index")) {
+                    result = (String) constant_pool.get(index).get(key);
+                    return "#" + index + " " + result.substring(result.indexOf(" "));
+                } else if (key.endsWith("bytes")) {
+                    result = (String) constant_pool.get(index).get("bytes");
+                    return "#" + index + " " + result;
+                }
+            }
+            throw new IOException("[Key Error!]");
+        } else {
+            throw new IOException("[Index Error!]: " + index);
+        }
+//        if (index > 0) {
+//            if (constant_pool.get(index).containsKey("constant_class_index")) {
+//                cp_info = (String) constant_pool.get(index).get("constant_class_index");
+//                if (cp_info == null) {
+//                    throw new IOException("[cp_info parse error!]");
+//                }
+//                return "#" + index + cp_info.substring(cp_info.indexOf(" "));
+//            } else if (constant_pool.get(index).containsKey("bytes")) {
+//                bytes_value = (String) constant_pool.get(index).get("bytes");
+//                if (bytes_value == null) {
+//                    throw new IOException("[bytes_value parse error!]");
+//                }
+//                return "#" + index + " " + bytes_value;
+//            } else if (constant_pool.get(index).containsKey("constant_string_index")) {
+//                constant_string_value = (String) constant_pool.get(index).get("constant_string_index");
+//                if (constant_string_value == null) {
+//                    throw new IOException("[string_info parse error!]");
+//                }
+//                return "#" + index + constant_string_value.substring(constant_string_value.indexOf(" "));
+//            } else if (constant_pool.get(index).containsKey("reference_index")) {
+//                reference_index = (String) constant_pool.get(index).get("reference_index");
+//                if (reference_index == null) {
+//                    throw new IOException("[reference_index parse error!]");
+//                }
+//                return "#" + index + reference_index.substring(reference_index.indexOf(" "));
+//            } else {
+//                throw new IOException("[key parse error!]");
+//            }
+//        }
+    }
+
+    /**
+     * 根据tag来获取对应的tag_name
+     *
+     * @param tag 标签 (int)
+     * @return tag_name (String)
+     */
     private static String getTagNameByNumber(int tag) {
         switch (tag) {
             case 1:
@@ -442,6 +735,11 @@ public class ClassParser {
         return null;
     }
 
+    /**
+     * 以JSON字符串的形式输出字节码的信息
+     *
+     * @throws IOException
+     */
     public void showByteCodeInfo() throws IOException {
         if (magic != 0xCAFEBABE) {
             throw new IOException("ByteCode file doesn't be parsed");
@@ -454,8 +752,8 @@ public class ClassParser {
                 "  \\_____|_|\\__,_|___/___/ |_|   \\__,_|_|  |___/\\___|_|      |_(_)___/ \n" +
                 "                                                                      \n" +
                 "                                                                      ");
+
         // print ByteCode information
         FormatUtil.printJson(JSON.toJSONString(this));
     }
-
 }
