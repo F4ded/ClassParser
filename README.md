@@ -127,7 +127,7 @@ public class TestClass implements TestInterface {
 		},
 		6:{
 			"tag":"CONSTANT_Class_info",
-			"constant_class_index":"#37 class_study/TestClass"
+			"constant_class_index":"#37 com/company/TestClass"
 		},
 		7:{
 			"tag":"CONSTANT_Class_info",
@@ -135,7 +135,7 @@ public class TestClass implements TestInterface {
 		},
 		8:{
 			"tag":"CONSTANT_Class_info",
-			"constant_class_index":"#39 class_study/TestInterface"
+			"constant_class_index":"#39 com/company/TestInterface"
 		},
 		9:{
 			"tag":"CONSTANT_Utf8_info",
@@ -199,7 +199,7 @@ public class TestClass implements TestInterface {
 		21:{
 			"tag":"CONSTANT_Utf8_info",
 			"length":23,
-			"bytes":"Lclass_study/TestClass;"
+			"bytes":"Lcom/company/TestClass;"
 		},
 		22:{
 			"tag":"CONSTANT_Utf8_info",
@@ -275,7 +275,7 @@ public class TestClass implements TestInterface {
 		37:{
 			"tag":"CONSTANT_Utf8_info",
 			"length":21,
-			"bytes":"class_study/TestClass"
+			"bytes":"com/company/TestClass"
 		},
 		38:{
 			"tag":"CONSTANT_Utf8_info",
@@ -285,7 +285,7 @@ public class TestClass implements TestInterface {
 		39:{
 			"tag":"CONSTANT_Utf8_info",
 			"length":25,
-			"bytes":"class_study/TestInterface"
+			"bytes":"com/company/TestInterface"
 		},
 		40:{
 			"tag":"CONSTANT_Utf8_info",
@@ -396,11 +396,11 @@ public class TestClass implements TestInterface {
 		}
 	},
 	"access_flags":33,
-	"this_class":"#6  class_study/TestClass",
+	"this_class":"#6  com/company/TestClass",
 	"super_class":"#7  java/lang/Object",
 	"interfaces_count":1,
 	"interfaces_info_array":[
-		"#8  class_study/TestInterface"
+		"#8  com/company/TestInterface"
 	],
 	"fields_count":2,
 	"fields":{
@@ -470,7 +470,8 @@ public class TestClass implements TestInterface {
 								"start_pc":0,
 								"length":10,
 								"name_index":"#20 this",
-								"index":"#21 Lclass_study/TestClass;"
+								"descriptor_index":"#21 Lcom/company/TestClass;",
+								"index":0
 							}
 						}
 					}
@@ -514,7 +515,8 @@ public class TestClass implements TestInterface {
 								"start_pc":0,
 								"length":16,
 								"name_index":"#20 this",
-								"index":"#21 Lclass_study/TestClass;"
+								"descriptor_index":"#21 Lcom/company/TestClass;",
+								"index":0
 							}
 						}
 					}
