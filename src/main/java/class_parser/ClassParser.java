@@ -463,19 +463,17 @@ public class ClassParser implements Opcodes {
                             int start_pc = dis.readUnsignedShort();
                             int length = dis.readUnsignedShort();
                             int name_index = dis.readUnsignedShort();
+                            int descriptor_index = dis.readUnsignedShort();
                             int index = dis.readUnsignedShort();
 
                             local_variable_table.put("start_pc", start_pc);
                             local_variable_table.put("length", length);
                             local_variable_table.put("name_index", getCpInfoByIndex(name_index));
-                            local_variable_table.put("index", getCpInfoByIndex(index));
+                            local_variable_table.put("descriptor_index", getCpInfoByIndex(descriptor_index));
+                            local_variable_table.put("index", index);
 
                             attr_info.put("local_variable_table #" + j, local_variable_table);
                         }
-                        /*
-                        TODO: 解析完方法的code属性会留出两个字节的00，原因目前未知。
-                         */
-                        dis.readUnsignedShort();
                         break;
                     }
                     /*
