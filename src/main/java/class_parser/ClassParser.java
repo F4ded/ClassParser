@@ -396,9 +396,10 @@ public class ClassParser implements Opcodes {
                         int code_length = dis.readInt();
                         attr_info.put("code_length", code_length);
                         byte[] code = new byte[code_length];
+
                         // TODO:解析虚拟机指令
                         dis.read(code);
-                        attr_info.put("code", code);
+                        attr_info.put("code", Arrays.toString(code));
 
                         int exception_table_length = dis.readUnsignedShort();
                         attr_info.put("exception_table_length", exception_table_length);
@@ -440,7 +441,6 @@ public class ClassParser implements Opcodes {
                         }
                         break;
                     }
-
                     /*
                     LocalVariableTable_attribute {
                         u2 attribute_name_index;
@@ -577,15 +577,56 @@ public class ClassParser implements Opcodes {
                         break;
                     }
                     /*
-
+                    attribute_length must be 0x00000000
                      */
+                    case "Deprecated":
+                    case "Synthetic": {
+                        if (attribute_length != 0x00) {
+                            throw new IOException("[Deprecated or Synthetic attribute parse error!]");
+                        }
+                        break;
+                    }
+                    /*
+                    Signature_attribute {
+                        u2 attribute_name_index;
+                        u4 attribute_length;
+                        u2 signature_index;
+                    }
+                     */
+                    case "Signature": {
+                        int signature_index = dis.readUnsignedShort();
+                        attr_info.put("signature_index", getCpInfoByIndex(signature_index));
+                        break;
+                    }
+                    /*
+                    MethodParameters_attribute {
+                        u2 attribute_name_index;
+                        u4 attribute_length;
+                        u1 parameters_count;
+                        {   u2 name_index;
+                            u2 access_flags;
+                        } parameters[parameters_count];
+                    }
+                     */
+                    case "MethodParameters": {
+                        int parameters_count = dis.readUnsignedByte();
+                        attr_info.put("parameter_count", parameters_count);
+                        for (int j = 0; j < parameters_count; j++) {
+                            LinkedHashMap<String, Object> parameters = new LinkedHashMap<>();
+                            int name_index = dis.readUnsignedShort();
+                            parameters.put("name_index", getCpInfoByIndex(name_index));
+                            int access_flags = dis.readUnsignedShort();
+                            parameters.put("access_flags", access_flags);
+                            attr_info.put("parameters #" + j, parameters);
+                        }
+                    }
+
                     default: {
                         byte[] info = new byte[attribute_length];
                         dis.read(info);
                         attr_info.put("info", info);
                     }
                 }
-
 
                 /*
                 最后放入到带索引信息的总Map中
@@ -753,5 +794,6 @@ public class ClassParser implements Opcodes {
 
         // print ByteCode information
         FormatUtil.printJson(JSON.toJSONString(this));
+//        System.out.println(JSON.toJSONString(this));
     }
 }

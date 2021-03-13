@@ -20,11 +20,11 @@
 * 本类、父类信息
 * 接口信息
 * 字段、方法信息
-* 属性
+* 部分属性信息
 
 该解析器会把解析到的信息以json格式的字符串打印出来，修改`Main.java`中`.class`文件的路径，即可在控制台打印出解析出的信息。
 
-由于属性的结构比较复杂，所以目前只可以解析部分属性：
+由于属性的结构比较复杂，所以目前可以解析的属性有：
 
 * Code
 * ConstantValue
@@ -34,6 +34,10 @@
 * InnerClasses
 * BootstrapMethods
 * Exceptions
+* Synthetic
+* Deprecated
+* Signature
+* MethodParameters
 
 **Code 属性中的虚拟机指令（Opcodes）还不能解析，当前会把指令放到一个 byte 数组中，等我学会了虚拟机指令映射再来完善这一功能😐。**
 
@@ -63,7 +67,6 @@
 
 * **实现更多属性的解析**
 * **解析Code属性中的虚拟机指令**
-* **命令行使用工具**
 
 ## Example
 
@@ -569,7 +572,7 @@ public class TestClass implements TestInterface {
 ## Log
 
 * ***version 1.1：***
-  * 实现了部分属性的解析
+  * 增加了可解析的属性
   * 优化索引算法
   * 修复了一些bug
 * ***version 1.0：***
